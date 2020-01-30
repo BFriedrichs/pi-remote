@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html>
+  <meta name="viewport" content="width=device-width, user-scalable=no" />
+  <head>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+      }
+
+      html, body {
+        height: 100%;
+        width: 100%;
+        position: fixed;
+      }
+
+      body {
+        background-color: #2a2a2a;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .wrapper {
+        width: 80%;
+        max-width: 200px;
+
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+      }
+
+      #label {
+        color: #f1f1f1;
+        font-size: 45px;
+        margin-bottom: 32px;
+      }
+
+      #volume-remote {
+        flex: 1;
+        width: 100%;
+      }
+
+      #volume-buttons {
+        margin-left: 50px;
+
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      .sound-bar, .button {
+        width: 100%;
+        background-color: #f1f1f1;
+        height: 16px;
+        margin: 8px;
+        border-radius: 4px;
+        box-shadow: 2px 2px 5px 1px rgba(0,0,0,0.5);
+      }
+
+      .button {
+          width: 100px;
+          height: 100px;
+          border-radius: 50%;
+
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          font-size: 50px;
+          color: #2a2a2a;
+      }
+
+      .sound-bar.active {
+        background-color: green;
+      }
+
+      #controls {
+        width: 100%;
+        justify-content: center;
+        display: flex;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrapper">
+      <div id="label">0</div>
+      <div id="controls">
+        <div id="volume-remote"></div>
+        <div id="volume-buttons">
+          <div>
+            <div id="vol-up" class="button">+</div>
+            <div id="vol-down" class="button">-</div>
+          </div>
+          <div id="reset" class="button">R</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      function getCookie(cname) {
+        var name = cname + "=";
+        var decodedCookie = decodeURIComponent(document.cookie);
+        var ca = decodedCookie.split(';');
+        for(var i = 0; i <ca.length; i++) {
+          var c = ca[i];
+          while (c.charAt(0) == ' ') {
+            c = c.substring(1);
+          }
+          if (c.indexOf(name) == 0) {
+            return c.substring(name.length, c.length);
+          }
+        }
+        return "";
+      }
+
+      function setCookie(cname, cvalue, exminutes) {
+        var d = new Date();
+        d.setTime(d.getTime() + (exminutes*60*1000));
+        var expires = "expires="+ d.toUTCString();
+        document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+      }
+
+      function request(url) {
+        var oReq = new XMLHttpRequest();
+        oReq.open("GET", "http://" + window.location.host + "/" + url);
+        oReq.send();
+      }
+
+      var settingTimeout = null;
+      var currentActiveIndex = {{ currentVolume }} || getCookie("activeIndex");
+
+      var barCount = 20;
+      var applyChange = 0;
+
+      var $volUp = document.getElementById("vol-up");
+      var $volDown = document.getElementById("vol-down");
+      var $volReset = document.getElementById("reset");
+
+      $volUp.addEventListener("click", function(event) {
+        event.preventDefault();
+
+        var activeIndex = currentActiveIndex + 1;
+        $label.innerHTML = parseInt(100 * (activeIndex / barCount));
+        setCookie("activeIndex", activeIndex, 5);
+        request("vol_up?count=5");
+
+        var $remote = document.getElementById("volume-remote");
+        for (var i = 0; i < barCount + 1; i++) {
+          $remote.children[i].className = "sound-bar";
+
+          var isActive = (barCount - i) <= activeIndex;
+          if (isActive) {
+            $remote.children[i].className += " active";
+          }
+        }
+        currentActiveIndex = activeIndex;
+      });
+
+      $volDown.addEventListener("click", function(event) {
+        event.preventDefault();
+
+        var activeIndex = currentActiveIndex - 1;
+        $label.innerHTML = parseInt(100 * (activeIndex / barCount));
+        setCookie("activeIndex", activeIndex, 5);
+        request("vol_down?count=5");
+
+        var $remote = document.getElementById("volume-remote");
+        for (var i = 0; i < barCount + 1; i++) {
+          $remote.children[i].className = "sound-bar";
+
+          var isActive = (barCount - i) <= activeIndex;
+          if (isActive) {
+            $remote.children[i].className += " active";
+          }
+        }
+        currentActiveIndex = activeIndex;
+      });
+
+      $volReset.addEventListener("click", function(event) {
+        var shouldReset = confirm("Are you sure you want to set the remote volume to 0?");
+        if (!shouldReset) {
+          return;
+        }
+        request("reset");
+        var activeIndex = 0;
+        $label.innerHTML = 0;
+        for (var i = 0; i < barCount + 1; i++) {
+          $remote.children[i].className = "sound-bar";
+
+          var isActive = (barCount - i) <= activeIndex;
+          if (isActive) {
+            $remote.children[i].className += " active";
+          }
+        }
+        currentActiveIndex = activeIndex;
+      });
+
+      document.addEventListener("pointermove", function(event) {
+        event.preventDefault();
+        var isSoundBar = event.target.className.indexOf("sound-bar") !== -1;
+        if (!isSoundBar) {
+          return;
+        }
+
+        var $remote = document.getElementById("volume-remote");
+        var $label = document.getElementById("label");
+        var $soundBar = event.target;
+        var activeIndex = parseInt($soundBar.getAttribute("data-index"));
+        var change = activeIndex - currentActiveIndex;
+
+        if (change == 0) {
+          return;
+        }
+
+        $label.innerHTML = parseInt(100 * (activeIndex / barCount));
+        setCookie("activeIndex", activeIndex, 5);
+
+        applyChange += change;
+        clearTimeout(settingTimeout);
+        settingTimeout = setTimeout(function() {
+          if (applyChange == 0) {
+            return;
+          }
+
+          if (applyChange > 0) {
+            request("vol_up?count=" + Math.abs(applyChange) * 5);
+          } else {
+            request("vol_down?count=" + Math.abs(applyChange) * 5);
+          }
+
+          applyChange = 0;
+        }, 500);
+
+        for (var i = 0; i < barCount + 1; i++) {
+          $remote.children[i].className = "sound-bar";
+
+          var isActive = (barCount - i) <= activeIndex;
+          if (isActive) {
+            $remote.children[i].className += " active";
+          }
+        }
+        currentActiveIndex = activeIndex;
+      })
+
+      var $remote = document.getElementById("volume-remote");
+      var $label = document.getElementById("label");
+      $label.innerHTML = parseInt(100 * (currentActiveIndex / barCount));
+      for (var i = 0; i < barCount + 1; i++) {
+        var $soundBar = document.createElement("div");
+        $soundBar.className = "sound-bar";
+        var isActive = (barCount - i) <= currentActiveIndex;
+        if (isActive) {
+          $soundBar.className += " active";
+        }
+
+        $soundBar.setAttribute("data-index", (barCount - i).toString());
+        $remote.appendChild($soundBar);
+      }
+
+    </script>
+  </body>
+</html>
